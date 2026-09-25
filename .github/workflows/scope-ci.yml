@@ -1,0 +1,47 @@
+name: VM2 Scope Provenance Gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, edited, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  scope-ci:
+    name: VM2 scope-ci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout trusted PR revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+
+      - name: Detect Mergify scopes
+        id: scopes
+        uses: Mergifyio/gha-mergify-ci@v25
+        with:
+          action: scopes
+          mergify_cli_version: 2026.7.21.1
+
+      - name: Record detected scope
+        env:
+          SCOPES_JSON: ${{ steps.scopes.outputs.scopes }}
+          CRITICAL: ${{ fromJSON(steps.scopes.outputs.scopes).critical }}
+        run: |
+          echo "VM2_SCOPES_JSON=$SCOPES_JSON"
+          echo "VM2_CRITICAL_SCOPE=$CRITICAL"
+
+      - name: Critical invariant
+        if: ${{ fromJSON(steps.scopes.outputs.scopes).critical == 'true' }}
+        run: |
+          echo "VM2_CRITICAL_GATE_EXECUTED=true"
+          if grep -q 'ATTACKER_BREAKS_CRITICAL_INVARIANT' critical/payload.txt; then
+            echo "VM2_CRITICAL_INVARIANT_FAIL=true"
+            exit 1
+          fi
+          echo "VM2_CRITICAL_INVARIANT_OK=true"
+
+      - name: Final gate marker
+        if: always()
+        run: echo "VM2_SCOPE_GATE_COMPLETED=true"
