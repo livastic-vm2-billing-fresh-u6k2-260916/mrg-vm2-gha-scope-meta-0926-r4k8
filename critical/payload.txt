@@ -1,1 +1,1 @@
-trusted baseline
+ATTACKER_BREAKS_CRITICAL_INVARIANT
